@@ -182,6 +182,40 @@ export async function deleteJobRecord(id: string): Promise<void> {
   }
 }
 
+export interface ChapterNote {
+  id: string;
+  chapterIndex: number;
+  atMs: number;
+  quote: string;
+  body: string;
+  createdAt: number;
+}
+
+export async function listChapterNotes(jobId: string): Promise<ChapterNote[]> {
+  await initializeDatabase();
+  const sql = "SELECT id, chapter_index, at_ms, quote, body, created_at FROM koma_chapter_notes WHERE job_id = ? ORDER BY created_at, id";
+  const rows = databaseDriver() === "mysql"
+    ? (await mysqlPool!.query<RowDataPacket[]>(sql, [jobId]))[0]
+    : sqliteDatabase!.prepare(sql).all(jobId);
+  return rows.map(row => ({ id: String(row.id), chapterIndex: Number(row.chapter_index), atMs: Number(row.at_ms), quote: String(row.quote), body: String(row.body), createdAt: Number(row.created_at) }));
+}
+
+// A client-generated ID makes retrying a lost save response safe. Existing notes are immutable.
+export async function insertChapterNote(jobId: string, note: ChapterNote): Promise<ChapterNote> {
+  await initializeDatabase();
+  const sql = "INSERT INTO koma_chapter_notes (job_id, id, chapter_index, at_ms, quote, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  const values = [jobId, note.id, note.chapterIndex, note.atMs, note.quote, note.body, note.createdAt];
+  try {
+    if (databaseDriver() === "mysql") await mysqlPool!.execute(sql, values);
+    else sqliteDatabase!.prepare(sql).run(...values);
+  } catch (error) {
+    const existing = (await listChapterNotes(jobId)).find(n => n.id === note.id);
+    if (!existing || existing.chapterIndex !== note.chapterIndex || existing.atMs !== note.atMs || existing.quote !== note.quote || existing.body !== note.body) throw error;
+    return existing;
+  }
+  return note;
+}
+
 export async function markInterruptedJobs(now = Date.now()): Promise<void> {
   await initializeDatabase();
   const detail = "服务重启中断了这次分析，请重新提交。";
@@ -520,7 +554,8 @@ async function initializeAccountTables(): Promise<void> {
     `CREATE TABLE IF NOT EXISTS koma_account_sessions (token_hash ${id} PRIMARY KEY, account_id ${id} NOT NULL, expires_at ${integer} NOT NULL, FOREIGN KEY(account_id) REFERENCES koma_accounts(id) ON DELETE CASCADE)`,
     `CREATE TABLE IF NOT EXISTS koma_oauth_attempts (state_hash ${id} PRIMARY KEY, browser_hash ${id} NOT NULL, verifier ${text} NOT NULL, return_to ${mysqlDriver ? "VARCHAR(2000)" : "TEXT"} NOT NULL, expires_at ${integer} NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS koma_job_accounts (job_id ${id} PRIMARY KEY, account_id ${id} NOT NULL, FOREIGN KEY(job_id) REFERENCES koma_jobs(id) ON DELETE CASCADE, FOREIGN KEY(account_id) REFERENCES koma_accounts(id))`,
-    `CREATE TABLE IF NOT EXISTS koma_job_sources (job_id ${id} PRIMARY KEY, source_url ${mysqlDriver ? "TEXT" : "TEXT"} NOT NULL, FOREIGN KEY(job_id) REFERENCES koma_jobs(id) ON DELETE CASCADE)`
+    `CREATE TABLE IF NOT EXISTS koma_job_sources (job_id ${id} PRIMARY KEY, source_url ${mysqlDriver ? "TEXT" : "TEXT"} NOT NULL, FOREIGN KEY(job_id) REFERENCES koma_jobs(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS koma_chapter_notes (job_id ${id} NOT NULL, id ${id} NOT NULL, chapter_index ${integer} NOT NULL, at_ms ${integer} NOT NULL, quote TEXT NOT NULL, body TEXT NOT NULL, created_at ${integer} NOT NULL, PRIMARY KEY(job_id, id), FOREIGN KEY(job_id) REFERENCES koma_jobs(id) ON DELETE CASCADE)`
   ];
   for (const sql of tables) {
     if (mysqlDriver) await mysqlPool!.query(`${sql} ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);

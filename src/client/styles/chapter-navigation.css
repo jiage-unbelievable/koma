@@ -21,6 +21,10 @@
 .app-shell.companion-ui .chapter-entry-title em { display: inline-block; margin-left: 8px; color: var(--ink-2); font-style: normal; }
 .app-shell.companion-ui .chapter-disclosure { display: grid; flex: 0 0 44px; place-items: center; height: 44px; margin-top: 7px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer; }
 .app-shell.companion-ui .chapter-disclosure:hover { background: var(--paper); }
+.app-shell.companion-ui .chapter-thumbnail { position: relative; display: grid; place-items: center; flex: 0 0 66px; width: 66px; height: 50px; min-height: 50px; margin-top: 12px; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--paper-2); color: var(--ink); cursor: pointer; }
+.app-shell.companion-ui .chapter-thumbnail img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.app-shell.companion-ui .chapter-thumbnail > span { position: relative; align-self: end; width: 100%; padding: 3px 0; background: rgb(25 25 23 / 72%); color: #fff; font-size: 10px; line-height: 1.6; }
+.app-shell.companion-ui .chapter-entry-heading:has(.chapter-thumbnail) .chapter-seek { gap: 8px; padding-right: 4px; }
 .app-shell.companion-ui .chapter-introduction { padding: 0 18px 18px 44px; }
 .app-shell.companion-ui .chapter-introduction > p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.9; overflow-wrap: anywhere; }
 .app-shell.companion-ui .chapter-introduction .chapter-evidence { margin-top: 14px; padding: 0; border: 0; font-size: 12px; }

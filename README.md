@@ -7,6 +7,8 @@
 
 Koma is a self-hosted AI video analysis website. Upload a video or paste a direct MP4 URL to generate a summary, chapters, searchable subtitles, and key frames. Click a result to return to that moment in the video, or export the analysis and custom data fields for your notes or spreadsheet.
 
+Open a chapter thumbnail to watch that section alongside its original transcript. Select text to copy or quote it in a timestamped chapter note. Saved notes persist on the server and are owner-only; unsaved drafts stay in the current browser. Visual evidence is available inside each chapter instead of a separate frame gallery.
+
 ## Features
 
 - Upload a local video or paste a downloadable MP4 URL (`.mp4` paths, including signed query parameters). No third-party platform or share-link parsing.

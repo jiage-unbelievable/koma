@@ -71,7 +71,7 @@ afterAll(async () => {
 
 async function seedJob(id: string, status: string) {
   const prefix = `koma/jobs/${id}`;
-  const result = { title: id === own ? "KOMA Workspace Check Verification" : "Private video", summary: "Private summary", durationMs: 1000, chapters: [], tags: [], transcript: [{ startMs: 0, endMs: 1000, text: "Private words" }], frames: [{ filename: "frame.jpg", atMs: 0, storageKey: `${prefix}/frames/frame.jpg` }], extractedData: { private: true }, artifacts: [{ id: "0", name: "report.json", format: "json", mimeType: "application/json", content: "", sizeBytes: 2, storageKey: `${prefix}/artifacts/report.json` }] };
+  const result = { title: id === own ? "KOMA Workspace Check Verification" : "Private video", summary: "Private summary", durationMs: 1000, chapters: [{ title: "Chapter", summary: "Private chapter", startMs: 0, endMs: 1000 }], tags: [], transcript: [{ startMs: 0, endMs: 1000, text: "Private words" }], frames: [{ filename: "frame.jpg", atMs: 0, storageKey: `${prefix}/frames/frame.jpg` }], extractedData: { private: true }, artifacts: [{ id: "0", name: "report.json", format: "json", mimeType: "application/json", content: "", sizeBytes: 2, storageKey: `${prefix}/artifacts/report.json` }] };
   database.prepare("INSERT INTO koma_jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(id, "upload", "koma-verification.mp4", status, status, 100, "Ready", "zh", JSON.stringify({ instruction: "Reuse me", artifactFormats: ["json"] }), status === "done" ? JSON.stringify(result) : null, "mock", "mock", "mock", "mock", Date.now(), Date.now(), status === "done" ? Date.now() : null, prefix, `${prefix}/video/source.mp4`, "video/mp4", 1, status === "failed" ? "Failed" : null);
   for (const [path, bytes] of [["video/source.mp4", "not-a-real-video"], ["frames/frame.jpg", "frame"], ["artifacts/report.json", "{}"]]) {
     const target = join(root, "storage", prefix, path);
@@ -86,6 +86,37 @@ async function post(path: string, cookie: string, headers: Record<string, string
 }
 
 describe("account workspace HTTP boundaries", () => {
+  it("keeps notes private, validates chapter bounds, and persists retry-safe saves without losing concurrent notes", async () => {
+    const path = `/api/my/jobs/${own}/notes`;
+    const note = { id: "chapter-note-test-1", chapterIndex: 0, atMs: 500, quote: "Private words", body: "My thought <script>plain text</script>" };
+    const save = (body: unknown, cookie = cookieA, clientHeader = true) => fetch(`${baseUrl}${path}`, { method: "POST", headers: { cookie, "content-type": "application/json", ...(clientHeader ? mutation : {}) }, body: JSON.stringify(body) });
+    expect((await get(path)).status).toBe(401);
+    expect((await get(path, cookieB)).status).toBe(404);
+    expect((await save(note, cookieB)).status).toBe(404);
+    expect((await save(note, cookieA, false)).status).toBe(403);
+    for (const invalid of [{ chapterIndex: -1 }, { atMs: 1001 }, { atMs: -1 }, { body: "x".repeat(5001) }, { quote: 1 }]) expect((await save({ ...note, ...invalid })).status).toBe(400);
+    const first = await save(note);
+    expect(first.status).toBe(201);
+    const saved = await first.json();
+    const retried = await save(note);
+    expect(await retried.json()).toEqual(saved);
+    await Promise.all([save({ ...note, id: "chapter-note-test-2" }), save({ ...note, id: "chapter-note-test-3" })]);
+    const read = await get(path, cookieA);
+    expect(read.headers.get("cache-control")).toBe("no-store");
+    expect((await read.json() as { notes: unknown[] }).notes).toHaveLength(3);
+    expect(database.prepare("SELECT body FROM koma_chapter_notes WHERE job_id = ? AND id = ?").get(own, note.id)).toMatchObject({ body: note.body });
+    expect((await get(`/api/my/jobs/${legacyA}/notes`, cookieA)).status).toBe(404);
+  });
+
+  it("removes chapter notes with their owning job", async () => {
+    const id = "10000000-0000-4000-8000-000000000099";
+    await seedJob(id, "done");
+    database.prepare("INSERT INTO koma_job_accounts VALUES (?, ?)").run(id, "1");
+    const saved = await fetch(`${baseUrl}/api/my/jobs/${id}/notes`, { method: "POST", headers: { cookie: cookieA, ...mutation, "content-type": "application/json" }, body: JSON.stringify({ id: "note-cascade-check", chapterIndex: 0, atMs: 0, quote: "", body: "Note" }) });
+    expect(saved.status).toBe(201);
+    expect((await fetch(`${baseUrl}/api/my/jobs/${id}`, { method: "DELETE", headers: { cookie: cookieA, ...mutation } })).status).toBe(204);
+    expect(database.prepare("SELECT count(*) AS n FROM koma_chapter_notes WHERE job_id = ?").get(id)).toMatchObject({ n: 0 });
+  });
   it("returns only account history and never promotes a GitHub user to administrator", async () => {
     expect((await get("/api/my/jobs")).status).toBe(401);
     expect(await (await get("/api/my/jobs", cookieB)).json()).toEqual({ jobs: [] });

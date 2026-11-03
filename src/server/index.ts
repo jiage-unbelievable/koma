@@ -1,4 +1,5 @@
 import { cloneTextFirstCheckpoint } from "./application/text-first-cache.js";
+import { insertChapterNote, listChapterNotes } from "./persistence/database.js";
 import { createReadStream } from "node:fs";
 import { copyFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -350,6 +351,33 @@ app.get("/api/jobs/:id", async (request: FastifyRequest<{ Params: { id: string }
   const access = await canAccessJob(request, job.id);
   if (!access.allowed) return reply.code(404).send({ error: "找不到这次分析。" });
   return reply.header("cache-control", "no-store").send({ ...serializeJob(job), owned: access.owned, visibility: access.private ? "private" : "legacy-link", retryable: access.owned && await canRetryJob(job) });
+});
+
+// Notes are owner-only, including for replay links that are otherwise public.
+app.get<{ Params: { id: string } }>("/api/my/jobs/:id/notes", async (request, reply) => {
+  reply.header("cache-control", "no-store");
+  const user = await requireAccount(request, reply);
+  if (!user) return;
+  if (await readJobAccount(request.params.id) !== user.id) return reply.code(404).send({ error: "找不到这次分析。" });
+  return { notes: await listChapterNotes(request.params.id) };
+});
+
+app.post<{ Params: { id: string } }>("/api/my/jobs/:id/notes", { bodyLimit: 64 * 1024 }, async (request, reply) => {
+  reply.header("cache-control", "no-store");
+  if (!viewerMutationHeader(request)) return reply.code(403).send({ error: "用户请求校验失败。" });
+  const user = await requireAccount(request, reply);
+  if (!user) return;
+  if (await readJobAccount(request.params.id) !== user.id) return reply.code(404).send({ error: "找不到这次分析。" });
+  const job = await loadJob(request.params.id);
+  const body = request.body as Record<string, unknown> | undefined;
+  const chapterIndex = body?.chapterIndex;
+  const chapter = typeof chapterIndex === "number" && Number.isInteger(chapterIndex) ? job?.result?.chapters[chapterIndex] : undefined;
+  if (!chapter || typeof body?.id !== "string" || !/^[a-zA-Z0-9-]{8,64}$/.test(body.id)
+    || typeof body.atMs !== "number" || !Number.isSafeInteger(body.atMs) || body.atMs < chapter.startMs || body.atMs > chapter.endMs
+    || typeof body.body !== "string" || typeof body.quote !== "string" || body.body.length > 5000 || body.quote.length > 5000
+    || !(body.body.trim() || body.quote.trim())) return reply.code(400).send({ error: "笔记内容、章节或时间点无效。" });
+  const note = await insertChapterNote(request.params.id, { id: body.id, chapterIndex: chapterIndex as number, atMs: body.atMs, quote: body.quote.trim(), body: body.body.trim(), createdAt: Date.now() });
+  return reply.code(201).send({ note });
 });
 
 // Programmatic callers can fetch exactly the requested JSON value without Koma's summary wrapper.

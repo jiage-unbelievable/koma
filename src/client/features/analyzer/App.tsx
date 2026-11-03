@@ -1,3 +1,4 @@
+import { ChapterReader } from "./ChapterReader.js";
 import { ChapterNavigation } from "./ChapterNavigation.js";
 import { CompanionPortrait } from "./CompanionPortrait.js";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject, type FormEvent, type DragEvent, type KeyboardEvent, type ChangeEvent } from "react";
@@ -1187,7 +1188,7 @@ function App({ initialLanguage }: { initialLanguage?: Language } = {}) {
         </form>
       </section>}
       {job && !hasResult && <ProgressView job={job} progress={progress} error={error} onClear={leaveJob} onRetry={retryAnalysis} retrying={busy} language={language} />}
-      {hasResult && <ResultView job={job} onRestart={restartAnalysis} onDelete={deleteOwnedJob} language={language} />}
+      {hasResult && <ResultView key={job.id} job={job} accountId={accountId} onRestart={restartAnalysis} onDelete={deleteOwnedJob} language={language} />}
     </main>
     {showAdvancedSettings && <AdvancedSettingsDialog language={language} outputSchema={editorInitialSchema} fieldDescriptions={editorInitialFieldDescriptions} initialView={schemaDialogInitialView} returnFocusRef={schemaDialogReturnFocusRef} onCancel={() => setShowAdvancedSettings(false)} onApply={(next) => {
       setOutputSchema(next.outputSchema);
@@ -1220,7 +1221,7 @@ function FitTitle({ children }: { children: ReactNode }) {
   return <h1 ref={ref}>{children}</h1>;
 }
 
-function ResultView({ job, onRestart, onDelete, language }: { job: Job; onRestart: () => void; onDelete: (id: string) => Promise<boolean>; language: Language }) {
+function ResultView({ job, accountId, onRestart, onDelete, language }: { job: Job; accountId: string | null; onRestart: () => void; onDelete: (id: string) => Promise<boolean>; language: Language }) {
   const t = copy[language]; const result = job.result as AnalysisResult;
   const [selectedFrame, setSelectedFrame] = useState(0); const [currentMs, setCurrentMs] = useState(0); const [showSubtitles, setShowSubtitles] = useState(false); const [linkCopied, setLinkCopied] = useState(false); const [deleting, setDeleting] = useState(false); const videoRef = useRef<HTMLVideoElement>(null);
   // 结果页让浏览器标签页显示视频标题
@@ -1230,7 +1231,7 @@ function ResultView({ job, onRestart, onDelete, language }: { job: Job; onRestar
     return () => { document.title = previous; };
   }, [result.title, language]);
   const selected = result.frames[selectedFrame] || result.frames[0];
-  const [previewFrame, setPreviewFrame] = useState<Frame | null>(null);
+  const [reader, setReader] = useState<{ index: number; atMs: number } | null>(null);
   const [sidebarView, setSidebarView] = useState<"chapters" | "transcript">("chapters");
   const [transcriptQuery, setTranscriptQuery] = useState("");
   const [matchCursor, setMatchCursor] = useState(0);
@@ -1278,7 +1279,7 @@ function ResultView({ job, onRestart, onDelete, language }: { job: Job; onRestar
     <div className="stat-row"><div><span>{t.duration}</span><strong>{formatTime(result.durationMs)}</strong></div><div><span>{t.frames}</span><strong>{result.frames.length}</strong></div><div><span>{t.subtitleLines}</span><strong>{result.transcript.length}</strong></div><div><span>{t.autoDelete}</span><strong className="persistent-status">{t.replayReady}</strong></div></div>
     <section className="tag-panel"><div className="section-heading"><span>{t.contentTags}</span><small>{t.jumpTag}</small></div><div className="tag-list">{(result.tags || []).map((tag) => <button type="button" className="tag-chip" key={`${tag.category}-${tag.label}`} onClick={() => syncToTime(tag.atMs)}><span>{translateTagCategory(tag.category, language)}</span>{tag.label}<i>{formatTime(tag.atMs)}</i></button>)}</div></section>
 
-    <section className="keyframe-panel" aria-label={t.frameTimeline}><div className="section-heading"><span>{t.keyFrameGallery}</span><small>{t.keyFrameGallerySub}</small></div><div className="frame-gallery">{result.frames.map((frame, index) => <button key={frame.url} type="button" aria-label={`${t.jumpTo} ${formatTime(frame.atMs)}: ${frame.caption || t.keyFrame}`} className={index === selectedFrame ? "active" : ""} onClick={() => { syncToTime(frame.atMs, false); setPreviewFrame(frame); }}><span className="frame-gallery-image"><img src={frame.url} alt={frame.caption || t.keyFrame} /><i>{formatTime(frame.atMs)}</i><em><Glyph name="zoom" size={14} />{t.clickToEnlarge}</em></span><strong>{frame.caption || `${t.keyFrame} ${index + 1}`}</strong></button>)}</div></section>
+
 
   </div>
   <aside className="transcript-panel result-navigation">
@@ -1287,12 +1288,12 @@ function ResultView({ job, onRestart, onDelete, language }: { job: Job; onRestar
       <button type="button" aria-pressed={sidebarView === "chapters"} onClick={() => setSidebarView("chapters")}>{t.chapters}<span>{result.chapters.length}</span></button>
       <button type="button" aria-pressed={sidebarView === "transcript"} onClick={() => setSidebarView("transcript")}>{t.subtitlePanel}<span>{result.transcript.length}</span></button>
     </div>
-    {sidebarView === "chapters" && <ChapterNavigation chapters={result.chapters} currentMs={currentMs} transcript={result.transcript} frames={result.frames} onSeek={syncToTime} language={language} />}
+    {sidebarView === "chapters" && <ChapterNavigation chapters={result.chapters} currentMs={currentMs} transcript={result.transcript} frames={result.frames} onSeek={syncToTime} onPreview={index => { const atMs = Math.round((videoRef.current?.currentTime ?? currentMs / 1000) * 1000); videoRef.current?.pause(); setReader({ index, atMs }); }} language={language} />}
     <div className="sidebar-transcript" hidden={sidebarView !== "transcript"}>
     <div className="transcript-search"><label><span className="sr-only">{language === "zh" ? "搜索字幕" : "Search transcript"}</span><input type="search" value={transcriptQuery} onChange={(event) => setTranscriptQuery(event.target.value)} placeholder={language === "zh" ? "找到你记得的那一句…" : "Find the words you remember…"} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); jumpMatch(event.shiftKey ? -1 : 1); } }} /></label>{transcriptQuery.trim() && <div className="transcript-search-controls"><span role="status">{matchingLines.length ? `${matchCursor + 1} / ${matchingLines.length}` : (language === "zh" ? "没有找到相关字幕" : "No matching subtitles")}</span><button type="button" disabled={!matchingLines.length} aria-label={language === "zh" ? "上一条匹配字幕" : "Previous match"} onClick={() => jumpMatch(-1)}><Icon name="arrow-up" size={17} /></button><button type="button" disabled={!matchingLines.length} aria-label={language === "zh" ? "下一条匹配字幕" : "Next match"} onClick={() => jumpMatch(1)}><Icon name="arrow-down" size={17} /></button></div>}</div>
     <div className="transcript-list">{result.transcript.length ? result.transcript.map((line, index) => { const active = currentMs >= line.startMs && currentMs < line.endMs; const speaker = line.speaker != null && String(line.speaker).trim() ? `${t.speaker} ${line.speaker}` : t.voice; if (transcriptQuery.trim() && !matchingLines.includes(index)) return null; return <button ref={(element) => { if (element) transcriptRefs.current.set(index, element); else transcriptRefs.current.delete(index); }} type="button" className={`transcript-line ${active ? "active" : ""} ${transcriptQuery.trim() && matchingLines[matchCursor] === index ? "search-current" : ""}`} aria-pressed={active} key={`${line.startMs}-${index}`} onClick={() => { syncToTime(line.startMs); if (transcriptQuery.trim()) setMatchCursor(matchingLines.indexOf(index)); }}><span className="line-rail"><strong>{formatTime(line.startMs)}</strong><i>{formatTime(line.endMs)}</i></span><span className="line-body"><small><i />{speaker}</small><p><HighlightedText text={line.text} query={transcriptQuery} /></p><em><Glyph name="play" size={11} />{t.playFrom} {formatTime(line.startMs)}</em></span></button>; }) : <div className="transcript-empty">{t.noSpeech}</div>}</div></div><div className="panel-note"><Glyph name="link" size={14} />{job.visibility === "legacy-link" ? (language === "zh" ? "旧版回看链接 · 请谨慎转发" : "Legacy replay link · share with care") : t.remaining}</div></aside>
 
-  {previewFrame && <FramePreview frame={previewFrame} onClose={() => setPreviewFrame(null)} onPlay={() => { syncToTime(previewFrame.atMs); setPreviewFrame(null); }} onPrevious={() => { const index = result.frames.findIndex((frame) => frame.url === previewFrame.url); setPreviewFrame(result.frames[(index - 1 + result.frames.length) % result.frames.length]); }} onNext={() => { const index = result.frames.findIndex((frame) => frame.url === previewFrame.url); setPreviewFrame(result.frames[(index + 1) % result.frames.length]); }} language={language} />}
+  {reader && <ChapterReader chapter={result.chapters[reader.index]} chapterIndex={reader.index} currentMs={reader.atMs} videoUrl={result.videoUrl} frames={result.frames} transcript={result.transcript} jobId={job.id} accountId={accountId} canWriteNotes={Boolean(job.owned && accountId)} language={language} onClose={atMs => { syncToTime(atMs, false); setReader(null); }} />}
   </section>;
 }
 
@@ -1343,27 +1344,6 @@ function ArtifactPanel({ artifacts, language }: { artifacts: Artifact[]; languag
   </section>;
 }
 
-function FramePreview({ frame, onClose, onPlay, onPrevious, onNext, language }: { frame: Frame; onClose: () => void; onPlay: () => void; onPrevious: () => void; onNext: () => void; language: Language }) {
-  const t = copy[language];
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const onCloseRef = useRef(onClose);
-  const onPreviousRef = useRef(onPrevious);
-  const onNextRef = useRef(onNext);
-  onCloseRef.current = onClose;
-  onPreviousRef.current = onPrevious;
-  onNextRef.current = onNext;
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKeyDown = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") onCloseRef.current(); if (event.key === "ArrowLeft") onPreviousRef.current(); if (event.key === "ArrowRight") onNextRef.current(); };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><div className="frame-preview" role="dialog" aria-modal="true" aria-label={t.framePreview} onClick={(event) => event.stopPropagation()}>
-    <button ref={closeRef} className="modal-close" type="button" onClick={onClose} aria-label={t.close}><Icon name="close" size={20} /></button>
-    <div className="frame-preview-image"><img src={frame.url} alt={frame.caption || t.keyFrame} /><button className="frame-nav previous" type="button" onClick={onPrevious} aria-label={t.previousFrame}><Icon name="chevron-left" size={24} /></button><button className="frame-nav next" type="button" onClick={onNext} aria-label={t.nextFrame}><Icon name="chevron-right" size={24} /></button></div>
-    <div className="frame-preview-body"><span className="page-label">{t.framePreview} · {formatTime(frame.atMs)}</span><p>{frame.caption || t.keyFrame}</p><div className="frame-preview-actions"><a href={frame.url} target="_blank" rel="noreferrer">{t.openOriginal}</a><button className="primary-button" type="button" onClick={onPlay}><Glyph name="play" size={15} />{t.playThisMoment}</button></div></div>
-  </div></div>;
-}
 
 function frameIndexAtTime(frames: Frame[], atMs: number): number { let nearest = 0; for (let index = 0; index < frames.length; index += 1) { if (frames[index].atMs > atMs) break; nearest = index; } return nearest; }
 
