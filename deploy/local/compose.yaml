@@ -1,0 +1,44 @@
+services:
+  koma:
+    build:
+      context: ../..
+      dockerfile: deploy/local/Dockerfile
+    restart: unless-stopped
+    init: true
+    ports:
+      - '${KOMA_BIND_HOST:-127.0.0.1}:${KOMA_PORT:-3010}:3000'
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      KOMA_AUTH_MODE: local
+      PUBLIC_BASE_URL: '${KOMA_ORIGIN:-http://127.0.0.1:3010}'
+      DB_DRIVER: sqlite
+      KOMA_DATABASE_PATH: /app/data/koma.sqlite
+      STORAGE_DRIVER: local
+      LOCAL_STORAGE_PATH: /app/data/storage
+      ASR_PROVIDER: mock
+      KOMA_VISUAL_ONLY: 'true'
+      VISION_PROVIDER: openai-compatible
+      VISION_MODEL: MiniMax-M3.1-Flash
+      VISION_BASE_URL: '${KOMA_VISION_BASE_URL:-http://host.docker.internal:10891/v1}'
+      # Public placeholder; the real credential stays in the host Keychain.
+      VISION_API_KEY: keychain-broker
+      MAX_CONCURRENT_JOBS: '1'
+      MAX_UPLOAD_BYTES: '524288000'
+      MAX_DURATION_SECONDS: '900'
+    volumes:
+      - koma-data:/app/data
+    mem_limit: 2g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+volumes:
+  koma-data:

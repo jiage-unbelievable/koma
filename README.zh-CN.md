@@ -1,3 +1,5 @@
+> 此 Fork 的本地部署说明见 [本地工作区与 MiniMax](deploy/local/README.zh-CN.md)，下一阶段设计见 [文字优先视频分析](docs/TEXT_FIRST_VIDEO_DESIGN.zh-CN.md)。以下保留上游项目说明。
+
 <div align="center">
   <img src="public/koma-logo-round.png" width="112" alt="Koma 图标">
   <h1>Koma</h1>
