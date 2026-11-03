@@ -1,11 +1,12 @@
 # 本地工作区与 MiniMax 接入
 
-本分支迁移已经使用过的本地工作区和视觉分析能力。完整语音转写、语义分段和逐段抽帧尚未实现，设计见 [文字优先视频分析](../../docs/TEXT_FIRST_VIDEO_DESIGN.zh-CN.md)。
+本分支迁移已经使用过的本地工作区和视觉分析能力。v0.2.0 已接入 MiniMax 完整转写、主题分段与逐段音画分析，实现说明见 [文字优先视频分析](../../docs/TEXT_FIRST_VIDEO_DESIGN.zh-CN.md)。
 
 ## 模式
 
 - `KOMA_AUTH_MODE=local`：显式启用共享本地身份，无需 GitHub；所有能访问服务的人共用资料库。后台管理权限保持独立。未设置该开关时仍使用上游 GitHub 登录模式。
-- `KOMA_VISUAL_ONLY=true`：跳过语音转写，避免 mock ASR 的演示字幕影响真实视觉分析。输出空 transcript，不代表真实音轨没有讲话。接入真实 ASR 后再关闭。
+- `KOMA_TEXT_FIRST=true`：使用完整转写、全文理解与主题分段、逐段抽帧和独立视觉取证、音画联合说明、全片汇总。需要真实 ASR 和视觉模型，拒绝 mock；提供完整 TXT/SRT/JSON 导出与失败阶段复用。
+- `KOMA_VISUAL_ONLY=true`：在旧管线中跳过语音转写，避免 mock ASR 的演示字幕影响真实视觉分析。输出空 transcript，不代表真实音轨没有讲话。接入真实 ASR 后再关闭。
 - `PUBLIC_BASE_URL` 必须与浏览器访问的 origin 一致，以保留跨站请求检查。
 
 ## Compose 模板
@@ -16,11 +17,11 @@
 
 如需内网访问，显式设置 `KOMA_BIND_HOST` 和 `KOMA_ORIGIN`，并确保访问者可信。命名卷默认适配镜像内 node 用户。Synology 改为 bind mount 时，单独检查目录 ACL 与运行用户，不要把目录改为任意用户可写。
 
-`NODE_IMAGE` 构建参数可选择已缓存的兼容 Node 22 镜像。镜像为非 root 运行，并修正 FFprobe 执行权限。模板保留15分钟/500MiB、单任务和2GiB内存上限；提高上限不等于完成长视频能力验收。
+`NODE_IMAGE` 构建参数可选择已缓存的兼容 Node 22 镜像。镜像为非 root 运行，并修正 FFprobe 执行权限。模板设为2小时/2GiB上传上限、单任务和2GiB内存上限；提高上限不等于任意长视频都已验收。
 
 ## macOS 钥匙串代理
 
-`scripts/local/minimax-keychain-broker.mjs` 从登录钥匙串读取 MiniMax 密钥，固定转发 `MiniMax-M3.1-Flash` 的 OpenAI-compatible Chat Completions。Compose 中 `keychain-broker` 只是公开占位符。
+`scripts/local/minimax-keychain-broker.mjs` 从登录钥匙串读取 MiniMax 密钥，固定转发 `MiniMax-M3.1-Flash` 的 Chat Completions，以及 `asr-1.0` 的完整转写。ASR适配接口为 `/v1/audio/transcriptions`，实际转至官方 `/v1/speech_to_text`；音频必须为MP3切片且每片小于8MiB/480秒，词级返回合并为原文句段。Compose 中 `keychain-broker` 只是公开占位符。
 
 通过 macOS 钥匙串访问应用保存服务 `koma.minimax`、账号 `api-key` 的凭据；不要将真实密钥写入命令行、仓库、环境文件或日志。可以用以下非敏感环境变量引用现有条目：
 
@@ -30,7 +31,7 @@
 
 运行 `node scripts/local/minimax-keychain-broker.mjs`；NAS 使用时只放行明确的NAS来源地址。代理拒绝浏览器 Origin、其他模型/路由、外部图片URL、工具和流式调用，限制请求大小和并发。可使用用户级服务管理器保持运行。
 
-此路径依赖 Mac 开机、网络和钥匙串可用；失败会报告错误，不会自动改用模拟结果。视觉请求不包含音频，字幕和真实讲话理解需另行配置 ASR。
+此路径依赖 Mac 开机、网络和钥匙串可用；失败会报告错误，不会自动改用模拟结果。ASR 与视觉通过同一受限代理读取密钥；ASR切片完整发送给MiniMax，原视频不发送。仅运行旧视觉模式时不会转写音轨。
 
 ## 升级和回滚
 

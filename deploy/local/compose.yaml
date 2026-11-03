@@ -16,16 +16,22 @@ services:
       KOMA_DATABASE_PATH: /app/data/koma.sqlite
       STORAGE_DRIVER: local
       LOCAL_STORAGE_PATH: /app/data/storage
-      ASR_PROVIDER: mock
-      KOMA_VISUAL_ONLY: 'true'
+      ASR_PROVIDER: openai-compatible
+      ASR_MODEL: asr-1.0
+      ASR_API_KEY: keychain-broker
+      ASR_BASE_URL: '${KOMA_VISION_BASE_URL:-http://host.docker.internal:10891/v1}'
+      ASR_SEGMENT_SECONDS: '240'
+      AI_TIMEOUT_MS: '180000'
+      KOMA_TEXT_FIRST: 'true'
+      KOMA_VISUAL_ONLY: 'false'
       VISION_PROVIDER: openai-compatible
       VISION_MODEL: MiniMax-M3.1-Flash
       VISION_BASE_URL: '${KOMA_VISION_BASE_URL:-http://host.docker.internal:10891/v1}'
       # Public placeholder; the real credential stays in the host Keychain.
       VISION_API_KEY: keychain-broker
       MAX_CONCURRENT_JOBS: '1'
-      MAX_UPLOAD_BYTES: '524288000'
-      MAX_DURATION_SECONDS: '900'
+      MAX_UPLOAD_BYTES: '2147483648'
+      MAX_DURATION_SECONDS: '7200'
     volumes:
       - koma-data:/app/data
     mem_limit: 2g

@@ -1,6 +1,6 @@
 {
   "name": "koma",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Self-hosted AI video analysis with summaries, searchable transcripts, chapters, key frames, and structured data export.",
