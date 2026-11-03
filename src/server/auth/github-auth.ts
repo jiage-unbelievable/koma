@@ -10,6 +10,15 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const SESSION_COOKIE = "koma_session";
 const LOGIN_COOKIE = "koma_oauth";
 
+// Explicit opt-in for a trusted, single-user deployment. No admin privileges are granted.
+const LOCAL_USER: AccountUser = { id: "local-owner", login: "本地用户", name: "本地工作区", avatarUrl: "" };
+export function localWorkspaceEnabled(): boolean {
+  return process.env.KOMA_AUTH_MODE === "local";
+}
+export async function initializeWorkspaceIdentity(): Promise<void> {
+  if (localWorkspaceEnabled()) await saveAccount(LOCAL_USER);
+}
+
 export function githubAuthEnabled(): boolean {
   return Boolean(githubConfiguration());
 }
@@ -93,6 +102,7 @@ export async function completeGithubLogin(query: { state?: unknown; code?: unkno
 }
 
 export async function currentAccount(cookieHeader: string | undefined, now = Date.now()): Promise<AccountUser | null> {
+  if (localWorkspaceEnabled()) return { ...LOCAL_USER };
   const token = readTokenCookie(cookieHeader, SESSION_COOKIE);
   return token ? readAccountSession(hashToken(token), now) : null;
 }

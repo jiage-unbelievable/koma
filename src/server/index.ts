@@ -31,9 +31,10 @@ import { getRuntimeProviders, getSafeProviderSettings, initializeProviderSetting
 import { copyStoredFile, makeStoredPrefixPrivate, initializeStorage, storageHealth, storedObjectInfo } from "./persistence/storage.js";
 import { readViewerOwnerId } from "./auth/viewer-session.js";
 
-import { beginGithubLogin, clearAccountCookie, clearGithubLoginCookie, completeGithubLogin, currentAccount, githubAuthEnabled, revokeAccountSession } from "./auth/github-auth.js";
+import { localWorkspaceEnabled, initializeWorkspaceIdentity, beginGithubLogin, clearAccountCookie, clearGithubLoginCookie, completeGithubLogin, currentAccount, githubAuthEnabled, revokeAccountSession } from "./auth/github-auth.js";
 
 await initializeDatabase();
+await initializeWorkspaceIdentity();
 await markInterruptedJobs();
 await initializeStorage();
 await initializeProviderSettings();
@@ -63,6 +64,8 @@ app.get("/api/health", async () => {
     models: { asr: providers.asr.model || null, vision: providers.vision.model || null },
     limits: { maxUploadBytes: config.maxUploadBytes, maxDurationSeconds: config.maxDurationSeconds },
     features: { githubLogin: true, privateWorkspace: true, legacyClaim: true, jobRetry: true, customExtraction: true, analysisSpecGeneration: true, rawExtractionEndpoint: true, downloadableArtifacts: true, permanentReplay: true, viewerHistory: true, viewerOwnedDeletion: true, artifactFormats: ARTIFACT_FORMATS, admin: adminAuthEnabled(), analysisRequiresAdmin: analysisAuthRequired() },
+    visualOnly: process.env.KOMA_VISUAL_ONLY === "true",
+    authMode: localWorkspaceEnabled() ? "local" : "github",
     configured: { github: githubAuthEnabled(), asr: asrConfigured, vision: visionConfigured, analysis: visionConfigured },
     database: { driver: databaseDriver() },
     storage: storageHealth(),
@@ -107,7 +110,7 @@ app.get("/api/auth/session", async (request, reply) => {
   const user = await currentAccount(request.headers.cookie);
   const legacyOwner = user && readViewerOwnerId(request.headers.cookie);
   const legacyJobCount = legacyOwner ? (await listLegacyJobHistory(legacyOwner)).length : 0;
-  return reply.header("cache-control", "no-store").send({ enabled: githubAuthEnabled(), authenticated: Boolean(user), user, legacyJobCount });
+  return reply.header("cache-control", "no-store").send({ enabled: githubAuthEnabled(), localMode: localWorkspaceEnabled(), authenticated: Boolean(user), user, legacyJobCount });
 });
 
 app.get("/api/auth/github", async (request, reply) => {

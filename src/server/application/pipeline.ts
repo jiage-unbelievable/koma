@@ -78,7 +78,9 @@ export async function analyzeMedia({ inputPath, title, framesDir, audioDir, sign
   onProgress({ stage: "extracting_audio", percent: 46, detail: "把声音整理成适合听写的轨道。" });
   await mkdir(audioDir, { recursive: true });
   let transcript: Awaited<ReturnType<typeof transcribe>> = [];
-  if (media.hasAudio) {
+  if (process.env.KOMA_VISUAL_ONLY === "true") {
+    onProgress({ stage: "transcribing", percent: 65, detail: "仅分析画面；语音转写尚未启用。" });
+  } else if (media.hasAudio) {
     if (config.asrDiarization && providers.asr.provider === "dashscope") {
       onProgress({ stage: "transcribing", percent: 60, detail: "正在做说话人分离与听写。" });
       try {

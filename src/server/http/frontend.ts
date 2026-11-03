@@ -1,3 +1,4 @@
+import { localWorkspaceEnabled } from "../auth/github-auth.js";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import fastifyStatic from "@fastify/static";
@@ -59,7 +60,7 @@ export async function registerFrontend(app: FastifyInstance, root = resolve("dis
   });
 
   for (const [path, document] of PUBLIC_PAGES) {
-    app.get(path, async (_request, reply) => reply.sendFile(document));
+    app.get(path, async (_request, reply) => localWorkspaceEnabled() ? privateHeaders(reply).sendFile("app.html", { cacheControl: false }) : reply.sendFile(document));
   }
   for (const path of ["/admin", "/admin/", "/jobs/:id", "/jobs/:id/"]) {
     app.get(path, async (request, reply) => {
@@ -70,7 +71,7 @@ export async function registerFrontend(app: FastifyInstance, root = resolve("dis
 }
 
 function pageDocument(path: string): string | undefined {
-  return PUBLIC_PAGES.get(path) ?? ((path === "/admin" || path === "/admin/" || JOB_PAGE.test(path)) ? "app.html" : undefined);
+  return (localWorkspaceEnabled() && PUBLIC_PAGES.has(path) ? "app.html" : PUBLIC_PAGES.get(path)) ?? ((path === "/admin" || path === "/admin/" || JOB_PAGE.test(path)) ? "app.html" : undefined);
 }
 
 function privateNamespace(path: string): boolean {

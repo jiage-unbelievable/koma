@@ -79,6 +79,17 @@ describe("media analysis pipeline", () => {
     await expect(stat(audioDir)).rejects.toThrow();
   }, 30000);
 
+  it("does not feed demo speech to visual analysis when visual-only mode is enabled", async () => {
+    const dir = await mkdtemp(join(os.tmpdir(), "koma-visual-only-"));
+    tempDirs.push(dir);
+    vi.stubEnv("KOMA_VISUAL_ONLY", "true");
+    try {
+      const result = await analyzeMedia({ inputPath: videoPath, title: "visual-only.mp4", framesDir: join(dir, "frames"), audioDir: join(dir, "audio") });
+      expect(result.transcript).toEqual([]);
+      expect(result.frames.length).toBeGreaterThan(0);
+    } finally { vi.stubEnv("KOMA_VISUAL_ONLY", "false"); }
+  }, 30000);
+
   it("rejects files without a video stream with a friendly message", async () => {
     const dir = await mkdtemp(join(os.tmpdir(), "koma-pipeline-run-"));
     tempDirs.push(dir);

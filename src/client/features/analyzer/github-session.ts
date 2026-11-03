@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface GithubSession {
   enabled: boolean;
+  localMode?: boolean;
   authenticated: boolean;
   user?: { id: string; login: string; name: string | null; avatarUrl: string };
   legacyJobCount?: number;

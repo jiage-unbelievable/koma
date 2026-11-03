@@ -527,9 +527,16 @@ function Brand({ onClick, label }: { onClick?: () => void; label?: string }) {
 
 function App({ initialLanguage }: { initialLanguage?: Language } = {}) {
   const [language, setLanguage] = useState<Language>(() => initialLanguage ?? (typeof window === "undefined" ? "en" : publicLanguage(window.location.pathname) ?? (window.localStorage.getItem("koma-language") === "zh" ? "zh" : "en")));
-  const isPublicEntry = typeof window === "undefined" || publicLanguage(window.location.pathname) !== undefined;
-  const t = copy[language];
+  const isPublicEntry = typeof window === "undefined" || publicLanguage(window.location.pathname) !== undefined && document.getElementById("root")?.dataset.prerendered === "true";
   const auth = useGithubSession();
+  const localMode = Boolean(auth.session?.localMode);
+  const t = localMode ? {
+    ...copy[language],
+    historyText: language === "zh" ? "视频和分析历史保存在 NAS 的本地工作区，可直接查看。" : "Videos and analysis history are saved in your local workspace.",
+    remaining: language === "zh" ? "保存在本地工作区" : "Saved in the local workspace",
+    aboutMuted: language === "zh" ? "此部署使用共享的本地工作区，无需登录。能访问此服务的人可以查看和管理工作区内容。" : "This deployment uses a shared local workspace without sign-in. Anyone with access to the service can view and manage its jobs.",
+    aboutSteps: copy[language].aboutSteps.slice(0, 2)
+  } : copy[language];
   const authenticated = Boolean(auth.session?.authenticated);
   const [signingOut, setSigningOut] = useState(false);
   const [accountError, setAccountError] = useState("");
@@ -1109,7 +1116,7 @@ function App({ initialLanguage }: { initialLanguage?: Language } = {}) {
       {authenticated && <nav className="workspace-nav" aria-label={language === "zh" ? "工作区导航" : "Workspace navigation"}><button type="button" className={!libraryActive ? "selected" : ""} aria-current={!libraryActive ? "page" : undefined} onClick={goHome}>{language === "zh" ? "新分析" : "New analysis"}</button><button type="button" className={libraryActive ? "selected" : ""} aria-current={libraryActive ? "page" : undefined} onClick={enterLibrary}>{language === "zh" ? "资料库" : "Library"}{Boolean(auth.session?.legacyJobCount) && <i aria-label={language === "zh" ? "有旧任务可找回" : "Older jobs available"} />}</button></nav>}
       <div className="header-actions"><GithubStarLink language={language} />{isPublicEntry && !authenticated ? <a className="header-button language-button" href={publicPath(language === "en" ? "zh" : "en")} hrefLang={language === "en" ? "zh-CN" : "en"}>{t.language}</a> : <button className="header-button language-button" type="button" disabled={generatingSchema} onClick={() => { const next = language === "en" ? "zh" : "en"; if (isPublicEntry) window.history.replaceState({}, "", publicPath(next)); setLanguage(next); }}>{t.language}</button>}
       {authenticated && <span className="account-identity">{auth.session?.user?.avatarUrl && <img src={auth.session.user.avatarUrl} alt="" referrerPolicy="no-referrer" />}<span>{auth.session?.user?.login}</span></span>}
-      <div className="header-more" ref={moreMenuRef}><button className="header-more-trigger" type="button" disabled={generatingSchema} aria-label={language === "zh" ? "更多选项" : "More options"} aria-expanded={showMoreMenu} aria-controls="header-more-menu" onClick={() => setShowMoreMenu((value) => !value)}><Glyph name="settings" size={17} /></button>{showMoreMenu && <div id="header-more-menu"><button type="button" onClick={() => { setShowMoreMenu(false); setShowSettings(true); }}><Glyph name="info" size={16} />{t.help}</button><a href="/admin"><Glyph name="settings" size={16} />{t.admin}</a>{authenticated && <button type="button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? (language === "zh" ? "正在退出…" : "Signing out…") : (language === "zh" ? "退出登录" : "Sign out")}</button>}</div>}</div>
+      <div className="header-more" ref={moreMenuRef}><button className="header-more-trigger" type="button" disabled={generatingSchema} aria-label={language === "zh" ? "更多选项" : "More options"} aria-expanded={showMoreMenu} aria-controls="header-more-menu" onClick={() => setShowMoreMenu((value) => !value)}><Glyph name="settings" size={17} /></button>{showMoreMenu && <div id="header-more-menu"><button type="button" onClick={() => { setShowMoreMenu(false); setShowSettings(true); }}><Glyph name="info" size={16} />{t.help}</button><a href="/admin"><Glyph name="settings" size={16} />{t.admin}</a>{authenticated && !localMode && <button type="button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? (language === "zh" ? "正在退出…" : "Signing out…") : (language === "zh" ? "退出登录" : "Sign out")}</button>}</div>}</div>
     </div></div></header>
 
     <main className="main-shell">
