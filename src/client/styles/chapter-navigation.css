@@ -1,0 +1,38 @@
+/* Chapters stay beside the player, and precede the overview on narrow screens. */
+.app-shell.companion-ui .result-layout { grid-template-areas: "player navigation" "overview navigation"; row-gap: 0; }
+.app-shell.companion-ui .result-main { grid-area: player; }
+.app-shell.companion-ui .result-overview { grid-area: overview; min-width: 0; }
+.app-shell.companion-ui .result-navigation { grid-area: navigation; }
+.app-shell.companion-ui .result-navigation-switch { display: flex; flex: 0 0 auto; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.app-shell.companion-ui .result-navigation-switch button { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 44px; padding: 8px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink-2); font: inherit; font-size: 14px; cursor: pointer; }
+.app-shell.companion-ui .result-navigation-switch button[aria-pressed="true"] { border-color: var(--line); background: var(--paper-2); color: var(--ink); font-weight: 600; }
+.app-shell.companion-ui .result-navigation-switch button span { font-size: 11px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.app-shell.companion-ui .chapter-navigation { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.app-shell.companion-ui .chapter-entry { border-bottom: 1px solid var(--line); border-left: 2px solid transparent; }
+.app-shell.companion-ui .chapter-entry:last-child { border-bottom: 0; }
+.app-shell.companion-ui .chapter-entry.is-current { border-left-color: var(--ink-2); background: var(--paper-2); }
+.app-shell.companion-ui .chapter-entry-heading { display: flex; align-items: flex-start; padding: 8px 8px 8px 4px; }
+.app-shell.companion-ui .chapter-seek { display: flex; gap: 12px; flex: 1; min-width: 0; min-height: 64px; padding: 12px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.app-shell.companion-ui .chapter-seek:hover { background: var(--paper); border-radius: 6px; }
+.app-shell.companion-ui .chapter-number { padding-top: 3px; color: var(--muted); font: 11px/1.6 var(--font-ui); font-variant-numeric: tabular-nums; }
+.app-shell.companion-ui .chapter-entry-title { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.app-shell.companion-ui .chapter-entry-title strong { font-size: 14px; font-weight: 600; line-height: 1.75; overflow-wrap: anywhere; }
+.app-shell.companion-ui .chapter-entry-title > span { color: var(--muted); font: 11px/1.8 var(--font-ui); font-variant-numeric: tabular-nums; }
+.app-shell.companion-ui .chapter-entry-title em { display: inline-block; margin-left: 8px; color: var(--ink-2); font-style: normal; }
+.app-shell.companion-ui .chapter-disclosure { display: grid; flex: 0 0 44px; place-items: center; height: 44px; margin-top: 7px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer; }
+.app-shell.companion-ui .chapter-disclosure:hover { background: var(--paper); }
+.app-shell.companion-ui .chapter-introduction { padding: 0 18px 18px 44px; }
+.app-shell.companion-ui .chapter-introduction > p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.9; overflow-wrap: anywhere; }
+.app-shell.companion-ui .chapter-introduction .chapter-evidence { margin-top: 14px; padding: 0; border: 0; font-size: 12px; }
+.app-shell.companion-ui .chapter-introduction .evidence-frames { grid-template-columns: minmax(0, 1fr); }
+.app-shell.companion-ui .sidebar-transcript { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; }
+.app-shell.companion-ui .sidebar-transcript[hidden], .app-shell.companion-ui .chapter-introduction[hidden] { display: none; }
+.app-shell.companion-ui .result-navigation .panel-note { flex: 0 0 auto; }
+@media (max-width: 1120px) {
+  .app-shell.companion-ui .result-layout { grid-template-areas: "player" "navigation" "overview"; row-gap: 24px; }
+  .app-shell.companion-ui .result-layout .video-stage { margin-bottom: 0; }
+  .app-shell.companion-ui .chapter-navigation { flex: 0 1 auto; max-height: min(65dvh, 620px); }
+}
+@media (max-width: 480px) {
+  .app-shell.companion-ui .chapter-introduction { padding-left: 18px; }
+}
