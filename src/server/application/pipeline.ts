@@ -1,3 +1,4 @@
+import { analyzeTextFirst } from "./text-first.js";
 import { mkdir, rm } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { config } from "../config/config.js";
@@ -53,6 +54,7 @@ export function enqueueAnalysis(job: Job): void {
 
 interface AnalyzeMediaOptions {
   inputPath: string;
+  checkpointPrefix?: string;
   title: string;
   framesDir: string;
   audioDir: string;
@@ -65,10 +67,12 @@ interface AnalyzeMediaOptions {
 
 // 与 job 解耦的媒体分析管线，HTTP 任务与 headless CLI 共用。
 // 输入文件与帧目录的生命周期由调用方负责；音频切片作为中间产物在这里即时清理。
-export async function analyzeMedia({ inputPath, title, framesDir, audioDir, signal, language = "zh", analysisSpec = {}, providers = getRuntimeProviders(), onProgress = () => {} }: AnalyzeMediaOptions): Promise<AnalysisResult> {
+export async function analyzeMedia({ inputPath, title, framesDir, audioDir, signal, language = "zh", analysisSpec = {}, providers = getRuntimeProviders(), onProgress = () => {}, checkpointPrefix }: AnalyzeMediaOptions): Promise<AnalysisResult> {
   onProgress({ stage: "inspecting", percent: 12, detail: "正在读取视频尺寸和时长。" });
   const media = await inspectVideo(inputPath, { signal });
   if (!media.hasVideo) throw new Error("这个文件里没有视频画面，请换一个带画面的视频。");
+
+  if (process.env.KOMA_TEXT_FIRST === "true") return analyzeTextFirst({inputPath,framesDir,audioDir,media,title,language,analysisSpec,providers,signal,onProgress,checkpointPrefix});
 
   throwIfAborted(signal);
   onProgress({ stage: "extracting_frames", percent: 30, detail: "从视频里挑出几个视觉切片。" });
@@ -165,6 +169,7 @@ async function runAnalysis(job: Job, signal?: AbortSignal): Promise<void> {
 
     const result = await analyzeMedia({
       inputPath,
+      checkpointPrefix: job.storagePrefix,
       title: job.title,
       framesDir,
       audioDir,

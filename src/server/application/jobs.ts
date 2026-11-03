@@ -21,6 +21,12 @@ export interface Frame {
 }
 
 export interface Chapter {
+  id?: string;
+  spokenSummary?: string;
+  visualSummary?: string;
+  uncertainties?: string[];
+  transcriptIndices?: number[];
+  frameFilenames?: string[];
   startMs: number;
   endMs: number;
   title: string;
@@ -36,6 +42,8 @@ export interface Tag {
 export type StoredArtifact = Artifact & { storageKey?: string };
 
 export interface AnalysisResult {
+  pipeline?: string;
+  transcription?: {source: string; model: string | null; complete: boolean};
   title: string;
   durationMs: number;
   summary: string;

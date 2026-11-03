@@ -1,3 +1,4 @@
+import { cloneTextFirstCheckpoint } from "./application/text-first-cache.js";
 import { createReadStream } from "node:fs";
 import { copyFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -64,6 +65,7 @@ app.get("/api/health", async () => {
     models: { asr: providers.asr.model || null, vision: providers.vision.model || null },
     limits: { maxUploadBytes: config.maxUploadBytes, maxDurationSeconds: config.maxDurationSeconds },
     features: { githubLogin: true, privateWorkspace: true, legacyClaim: true, jobRetry: true, customExtraction: true, analysisSpecGeneration: true, rawExtractionEndpoint: true, downloadableArtifacts: true, permanentReplay: true, viewerHistory: true, viewerOwnedDeletion: true, artifactFormats: ARTIFACT_FORMATS, admin: adminAuthEnabled(), analysisRequiresAdmin: analysisAuthRequired() },
+    textFirst: process.env.KOMA_TEXT_FIRST === "true",
     visualOnly: process.env.KOMA_VISUAL_ONLY === "true",
     authMode: localWorkspaceEnabled() ? "local" : "github",
     configured: { github: githubAuthEnabled(), asr: asrConfigured, vision: visionConfigured, analysis: visionConfigured },
@@ -264,6 +266,7 @@ app.post<{ Params: { id: string } }>("/api/my/jobs/:id/retry", { onRequest: requ
         next.sourceUrl = undefined;
       }
     }
+    if (process.env.KOMA_TEXT_FIRST === "true") await cloneTextFirstCheckpoint(previous, next);
     enqueueAnalysis(next);
     return reply.header("cache-control", "no-store").code(202).send({ jobId: next.id });
   } catch {

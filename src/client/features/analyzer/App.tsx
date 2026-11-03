@@ -1,3 +1,4 @@
+import { ChapterEvidence } from "./ChapterEvidence.js";
 import { CompanionPortrait } from "./CompanionPortrait.js";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject, type FormEvent, type DragEvent, type KeyboardEvent, type ChangeEvent } from "react";
 import {
@@ -50,6 +51,9 @@ const copy = {
       extracting_frames: "Extracting frames",
       extracting_audio: "Preparing audio",
       transcribing: "Transcribing",
+      planning_text: "Understanding full transcript",
+      analyzing_sections: "Analyzing chapters",
+      synthesizing: "Summarizing all chapters",
       interpreting: "Generating summary",
       storing_video: "Saving video",
       storing_results: "Saving results",
@@ -231,6 +235,9 @@ const copy = {
       extracting_frames: "抽取画面",
       extracting_audio: "整理声音",
       transcribing: "听写字幕",
+      planning_text: "全文理解与主题分段",
+      analyzing_sections: "逐段音画分析",
+      synthesizing: "全片汇总",
       interpreting: "生成总结",
       storing_video: "保存视频",
       storing_results: "保存结果",
@@ -408,11 +415,11 @@ const copy = {
 interface JobProgress { stage: Stage; percent: number; detail: string; }
 interface TranscriptLine { startMs: number; endMs: number; text: string; speaker?: string; }
 interface Frame { filename: string; atMs: number; caption?: string; url: string; }
-interface Chapter { startMs: number; endMs: number; title: string; summary: string; }
+interface Chapter { spokenSummary?:string; visualSummary?:string; uncertainties?:string[]; transcriptIndices?:number[]; frameFilenames?:string[]; startMs: number; endMs: number; title: string; summary: string; }
 interface Tag { label: string; category: string; atMs: number; }
 type ArtifactFormat = "json" | "csv" | "markdown" | "srt" | "text";
 interface Artifact { id: string; name: string; format: ArtifactFormat; mimeType: string; language?: string; sizeBytes: number; downloadUrl: string; }
-interface AnalysisResult { title: string; durationMs: number; summary: string; tags: Tag[]; chapters: Chapter[]; transcript: TranscriptLine[]; hasSubtitles?: boolean; frames: Frame[]; videoUrl: string; extractedData?: unknown; artifacts?: Artifact[]; }
+interface AnalysisResult { pipeline?:string; transcription?:{source:string;model:string|null;complete:boolean}; title: string; durationMs: number; summary: string; tags: Tag[]; chapters: Chapter[]; transcript: TranscriptLine[]; hasSubtitles?: boolean; frames: Frame[]; videoUrl: string; extractedData?: unknown; artifacts?: Artifact[]; }
 interface Job { id: string; source: "upload" | "url"; title: string; createdAt: number; updatedAt: number; completedAt?: number | null; status: "queued" | "processing" | "done" | "failed"; progress: JobProgress; analysisSpec?: { instruction?: string; outputSchema?: unknown; artifactFormats?: ArtifactFormat[] }; result: AnalysisResult | null; error: string | null; owned?: boolean; visibility?: "private" | "legacy-link"; retryable?: boolean; }
 
 interface ServiceInfo { limits?: { maxUploadBytes?: number; maxDurationSeconds?: number }; configured?: { vision?: boolean; analysis?: boolean }; }
@@ -1264,11 +1271,12 @@ function ResultView({ job, onRestart, onDelete, language }: { job: Job; onRestar
     <div className="summary-block"><span><Glyph name="spark" size={15} />{t.aiSummary}</span><p>{result.summary}</p></div>
     {Object.prototype.hasOwnProperty.call(result, "extractedData") && <StructuredData data={result.extractedData} jobId={job.id} language={language} />}
     {result.artifacts?.length ? <ArtifactPanel artifacts={result.artifacts} language={language} /> : null}
+    {result.pipeline === "text-first-v1" && <p className="text-first-status">{language === "zh" ? `全文转写与逐段分析已完成 · ${result.transcription?.source === "minimax-asr" ? "MiniMax 真实转写" : result.transcription?.source === "no-audio" ? "视频无音轨" : "未识别到讲话"} · 点击章节可查看原文和画面证据` : "Complete transcript and chapter analysis · expand a chapter to inspect its source evidence"}</p>}
     <div className="stat-row"><div><span>{t.duration}</span><strong>{formatTime(result.durationMs)}</strong></div><div><span>{t.frames}</span><strong>{result.frames.length}</strong></div><div><span>{t.subtitleLines}</span><strong>{result.transcript.length}</strong></div><div><span>{t.autoDelete}</span><strong className="persistent-status">{t.replayReady}</strong></div></div>
     <section className="tag-panel"><div className="section-heading"><span>{t.contentTags}</span><small>{t.jumpTag}</small></div><div className="tag-list">{(result.tags || []).map((tag) => <button type="button" className="tag-chip" key={`${tag.category}-${tag.label}`} onClick={() => syncToTime(tag.atMs)}><span>{translateTagCategory(tag.category, language)}</span>{tag.label}<i>{formatTime(tag.atMs)}</i></button>)}</div></section>
 
     <section className="keyframe-panel" aria-label={t.frameTimeline}><div className="section-heading"><span>{t.keyFrameGallery}</span><small>{t.keyFrameGallerySub}</small></div><div className="frame-gallery">{result.frames.map((frame, index) => <button key={frame.url} type="button" aria-label={`${t.jumpTo} ${formatTime(frame.atMs)}: ${frame.caption || t.keyFrame}`} className={index === selectedFrame ? "active" : ""} onClick={() => { syncToTime(frame.atMs, false); setPreviewFrame(frame); }}><span className="frame-gallery-image"><img src={frame.url} alt={frame.caption || t.keyFrame} /><i>{formatTime(frame.atMs)}</i><em><Glyph name="zoom" size={14} />{t.clickToEnlarge}</em></span><strong>{frame.caption || `${t.keyFrame} ${index + 1}`}</strong></button>)}</div></section>
-    <section className="chapters"><div className="section-heading"><span>{t.chapters}</span><small>{result.chapters.length ? `${result.chapters.length} ${t.chaptersCount} · ${t.chaptersSub}` : ""}</small></div>{result.chapters.length ? <div className="chapter-list">{(result.chapters || []).map((chapter, index) => <button type="button" className="chapter" key={`${chapter.startMs}-${index}`} onClick={() => syncToTime(chapter.startMs)}><span className="chapter-rail"><strong>{index + 1}</strong><i>{formatTime(chapter.startMs)} – {formatTime(chapter.endMs)}</i></span><span className="chapter-body"><strong>{chapter.title}</strong><p>{chapter.summary}</p></span><Glyph name="arrow" size={18} /></button>)}</div> : <div className="chapter-empty">{t.noChapters}</div>}</section>
+    <section className="chapters"><div className="section-heading"><span>{t.chapters}</span><small>{result.chapters.length ? `${result.chapters.length} ${t.chaptersCount} · ${t.chaptersSub}` : ""}</small></div>{result.chapters.length ? <div className="chapter-list">{(result.chapters || []).map((chapter, index) => <div className="chapter-with-evidence" key={`${chapter.startMs}-${index}`}><button type="button" className="chapter" onClick={() => syncToTime(chapter.startMs)}><span className="chapter-rail"><strong>{index + 1}</strong><i>{formatTime(chapter.startMs)} – {formatTime(chapter.endMs)}</i></span><span className="chapter-body"><strong>{chapter.title}</strong><p>{chapter.summary}</p></span><Glyph name="arrow" size={18} /></button><ChapterEvidence chapter={chapter} transcript={result.transcript} frames={result.frames} onSeek={syncToTime} language={language}/></div>)}</div> : <div className="chapter-empty">{t.noChapters}</div>}</section>
   </div>
   <aside className="transcript-panel"><div className="panel-heading"><div><span className="page-label">WORDS & MOMENTS</span><h2>{t.subtitlePanel}</h2><p>{t.subtitlePanelText}</p></div><span className="live-dot" /></div>
     <div className="transcript-search"><label><span className="sr-only">{language === "zh" ? "搜索字幕" : "Search transcript"}</span><input type="search" value={transcriptQuery} onChange={(event) => setTranscriptQuery(event.target.value)} placeholder={language === "zh" ? "找到你记得的那一句…" : "Find the words you remember…"} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); jumpMatch(event.shiftKey ? -1 : 1); } }} /></label>{transcriptQuery.trim() && <div className="transcript-search-controls"><span role="status">{matchingLines.length ? `${matchCursor + 1} / ${matchingLines.length}` : (language === "zh" ? "没有找到相关字幕" : "No matching subtitles")}</span><button type="button" disabled={!matchingLines.length} aria-label={language === "zh" ? "上一条匹配字幕" : "Previous match"} onClick={() => jumpMatch(-1)}><Icon name="arrow-up" size={17} /></button><button type="button" disabled={!matchingLines.length} aria-label={language === "zh" ? "下一条匹配字幕" : "Next match"} onClick={() => jumpMatch(1)}><Icon name="arrow-down" size={17} /></button></div>}</div>

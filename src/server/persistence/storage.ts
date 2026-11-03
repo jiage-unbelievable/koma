@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { copyFile, mkdir, readFile, rm, stat, writeFile, rename } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type OSS from "ali-oss";
 import { uploadOssObject, type StoredWriteOptions } from "./oss-upload.js";
@@ -51,7 +52,12 @@ export async function putStoredText(key: string, content: string, mimeType: stri
     if (storageDriver() === "oss") return uploadOssObject(await createOssClient(), safeKey, Buffer.from(content, "utf8"), mimeType, options);
     const target = localObjectPath(safeKey);
     await mkdir(dirname(target), { recursive: true, mode: 0o700 });
-    await writeFile(target, content, { encoding: "utf8", mode: 0o600 });
+    const temp=`${target}.tmp-${randomUUID()}`;
+    try {
+      await writeFile(temp, content, { encoding: "utf8", mode: 0o600 });
+      options.signal?.throwIfAborted();
+      await rename(temp,target);
+    } finally { await rm(temp,{force:true}); }
   });
 }
 

@@ -51,6 +51,7 @@ export async function transcribe({
     for (const line of lines) {
       transcript.push({
         ...line,
+        ...(line.speaker ? {speaker: `片段${Math.floor(segment.startMs / (config.asrSegmentSeconds * 1000)) + 1} / ${line.speaker}`} : {}),
         startMs: line.startMs + segment.startMs,
         endMs: line.endMs + segment.startMs
       });
@@ -258,7 +259,8 @@ export async function requestOpenAICompatibleSubtitle({
     .map((item) => ({
       startMs: Math.max(0, Math.round((Number(item.start) || 0) * 1000)),
       endMs: Math.max(0, Math.round((Number(item.end) || 0) * 1000)),
-      text: compactTranscriptText(String(item.text || ""))
+      text: compactTranscriptText(String(item.text || "")),
+      ...((item as { speaker?: string }).speaker ? { speaker: String((item as { speaker?: string }).speaker) } : {})
     }))
     .filter((line) => line.text);
   if (lines.length) return lines;

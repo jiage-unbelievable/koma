@@ -1,0 +1,77 @@
+.chapter-with-evidence {
+  border-bottom: 1px solid var(--line);
+}
+.chapter-with-evidence .chapter {
+  border-bottom: 0;
+}
+.chapter-evidence {
+  padding: 0 16px 18px 52px;
+  text-align: left;
+}
+.chapter-evidence > summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 13px;
+  padding: 8px 0;
+}
+.chapter-evidence p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink);
+  margin: 10px 0;
+}
+.chapter-evidence .evidence-uncertain {
+  color: #8a5b28;
+}
+.evidence-frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.evidence-frames button {
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 6px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.evidence-frames img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: contain;
+  display: block;
+}
+.evidence-frames span {
+  font-size: 12px;
+  display: block;
+  padding: 6px 0;
+}
+.evidence-transcript {
+  max-height: 320px;
+  overflow: auto;
+}
+.evidence-transcript button {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-align: left;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.evidence-transcript time {
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+}
+@media (max-width: 600px) {
+  .chapter-evidence {
+    padding-left: 16px;
+  }
+}
